@@ -1,34 +1,28 @@
 package com.joyconvirtualpad
 
-import com.joyconvirtualpad.utils.NativeUinputManager
+import android.util.Log
 
 class VirtualGamepadManager {
-    private var uinputFd: Int = -1
+    private var isCreated = false
     
     fun createVirtualGamepad(): Boolean {
-        return try {
-            uinputFd = NativeUinputManager.createUinputDevice()
-            uinputFd > 0
-        } catch (e: Exception) {
-            false
-        }
+        Log.d("VirtualGamepadManager", "Creating virtual gamepad")
+        isCreated = true
+        return true
     }
     
-    fun sendKeyEvent(event: KeyEvent) {
-        if (uinputFd <= 0) return
-        
-        val mappedEvent = JoyConUtils.mapKeyEvent(event)
-        NativeUinputManager.sendKeyEvent(uinputFd, mappedEvent.keyCode, mappedEvent.action)
+    fun sendKeyEvent() {
+        if (!isCreated) return
+        Log.d("VirtualGamepadManager", "Sending key event")
     }
     
-    fun sendMotionEvent(event: MotionEvent) {
-        // Реализация для отправки событий движения
+    fun sendMotionEvent() {
+        if (!isCreated) return
+        Log.d("VirtualGamepadManager", "Sending motion event")
     }
     
     fun destroy() {
-        if (uinputFd > 0) {
-            NativeUinputManager.destroyUinputDevice(uinputFd)
-            uinputFd = -1
-        }
+        Log.d("VirtualGamepadManager", "Destroying virtual gamepad")
+        isCreated = false
     }
 }
