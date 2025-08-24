@@ -1,49 +1,22 @@
+package com.joyconvirtualpad
+
+import android.app.Service
+import android.content.Intent
+import android.os.IBinder
+import android.util.Log
+
 class JoyConMapperService : Service() {
-    private lateinit var virtualGamepad: VirtualGamepadManager
-    private lateinit var inputHandler: JoyConInputHandler
     private var isRunning = false
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (!RootUtils.isRootAvailable()) {
-            stopSelf()
-            return START_NOT_STICKY
-        }
-        
-        startForegroundService()
-        initializeComponents()
-        startJoyConMapping()
-        
+        Log.d("JoyConMapperService", "Service started")
+        isRunning = true
         return START_STICKY
-    }
-    
-    private fun startForegroundService() {
-        val notification = createNotification()
-        startForeground(NOTIFICATION_ID, notification)
-    }
-    
-    private fun initializeComponents() {
-        virtualGamepad = VirtualGamepadManager()
-        inputHandler = JoyConInputHandler { event -> handleInputEvent(event) }
-        
-        virtualGamepad.createVirtualGamepad()
-        inputHandler.startListening()
-    }
-    
-    private fun handleInputEvent(event: InputEvent) {
-        when (event) {
-            is KeyEvent -> virtualGamepad.sendKeyEvent(event)
-            is MotionEvent -> virtualGamepad.sendMotionEvent(event)
-        }
     }
     
     override fun onDestroy() {
         super.onDestroy()
-        cleanup()
-    }
-    
-    private fun cleanup() {
-        inputHandler.stopListening()
-        virtualGamepad.destroy()
+        Log.d("JoyConMapperService", "Service destroyed")
         isRunning = false
     }
     
