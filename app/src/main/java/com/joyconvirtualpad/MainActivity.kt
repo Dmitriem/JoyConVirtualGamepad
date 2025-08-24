@@ -1,43 +1,29 @@
+package com.joyconvirtualpad
+
+import android.os.Bundle
+import android.widget.Switch
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+
 class MainActivity : AppCompatActivity() {
-    private lateinit var binding: ActivityMainBinding
-    private val serviceIntent by lazy { Intent(this, JoyConMapperService::class.java) }
+    private lateinit var statusText: TextView
+    private lateinit var enableSwitch: Switch
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        setContentView(R.layout.activity_main)
         
-        setupUi()
-        checkRootAccess()
-    }
-    
-    private fun setupUi() {
-        binding.switchEnable.setOnCheckedChangeListener { _, isChecked ->
+        statusText = findViewById(R.id.tvStatus)
+        enableSwitch = findViewById(R.id.switchEnable)
+        
+        statusText.text = "Приложение запущено"
+        
+        enableSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                if (RootUtils.isRootAvailable()) {
-                    startService(serviceIntent)
-                } else {
-                    showRootRequiredDialog()
-                }
+                statusText.text = "Виртуальный геймпад включен"
             } else {
-                stopService(serviceIntent)
+                statusText.text = "Виртуальный геймпад выключен"
             }
         }
-    }
-    
-    private fun checkRootAccess() {
-        binding.tvStatus.text = if (RootUtils.isRootAvailable()) {
-            "Root доступ получен ✓"
-        } else {
-            "Требуется root доступ ⚠️"
-        }
-    }
-    
-    private fun showRootRequiredDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Требуется Root")
-            .setMessage("Для работы приложения необходим root доступ")
-            .setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }
-            .show()
     }
 }
