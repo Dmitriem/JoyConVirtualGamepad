@@ -1,39 +1,29 @@
+package com.joyconvirtualpad
+
+import android.content.Context
+import android.view.InputDevice
+import android.view.InputEvent
+import android.view.InputManager
+import android.util.Log
+
 class JoyConInputHandler(private val eventCallback: (InputEvent) -> Unit) {
     private val inputDeviceIds = mutableListOf<Int>()
     private var isListening = false
     
     fun startListening() {
         isListening = true
-        Thread(inputMonitorRunnable).start()
+        // Базовая реализация для тестирования
+        Log.d("JoyConInputHandler", "Input handler started")
     }
     
     fun stopListening() {
         isListening = false
+        Log.d("JoyConInputHandler", "Input handler stopped")
     }
     
-    private val inputMonitorRunnable = Runnable {
-        while (isListening) {
-            scanForJoyConDevices()
-            readInputEvents()
-            Thread.sleep(16) // ~60 FPS
-        }
-    }
-    
-    private fun scanForJoyConDevices() {
-        val inputManager = getSystemService(Context.INPUT_SERVICE) as InputManager
-        inputDeviceIds.clear()
-        
-        inputManager.inputDeviceIds.forEach { deviceId ->
-            InputDevice.getDevice(deviceId)?.let { device ->
-                if (JoyConUtils.isJoyConDevice(device)) {
-                    inputDeviceIds.add(deviceId)
-                }
-            }
-        }
-    }
-    
-    private fun readInputEvents() {
-        // Здесь будет код для чтения событий через /dev/input/eventX
-        // с использованием нативного кода или FileInputStream
+    // Упрощенная версия для тестирования
+    fun simulateJoyConInput() {
+        // Заглушка для тестирования
+        Log.d("JoyConInputHandler", "Simulating JoyCon input")
     }
 }
