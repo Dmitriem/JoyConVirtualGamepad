@@ -5,7 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:  # Позволяет запускать вручную
+  workflow_dispatch:
 
 jobs:
   build:
@@ -24,7 +24,7 @@ jobs:
       run: chmod +x ./gradlew
       
     - name: Build APK
-      run: ./gradlew assembleDebug
+      run: ./gradlew :app:assembleDebug
       
     - name: Upload APK
       uses: actions/upload-artifact@v4
