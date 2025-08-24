@@ -1,11 +1,15 @@
 package com.joyconvirtualpad.utils
 
 object NativeUinputManager {
-    init {
-        System.loadLibrary("joyconvirtualpad")
+    fun createUinputDevice(): Int {
+        return 1 // Заглушка для тестирования
     }
     
-    external fun createUinputDevice(): Int
-    external fun sendKeyEvent(fd: Int, code: Int, value: Int)
-    external fun destroyUinputDevice(fd: Int)
+    fun sendKeyEvent(fd: Int, code: Int, value: Int) {
+        // Заглушка для тестирования
+    }
+    
+    fun destroyUinputDevice(fd: Int) {
+        // Заглушка для тестирования
+    }
 }
