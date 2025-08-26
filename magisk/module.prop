@@ -1,0 +1,6 @@
+id=joycon-uinput
+name=JoyCon UInput
+version=1.0
+versionCode=1
+author=Lyra
+description=Virtual Xbox controller from JoyCon
