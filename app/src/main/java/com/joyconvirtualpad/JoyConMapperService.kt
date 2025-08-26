@@ -13,6 +13,7 @@ import com.joyconvirtualpad.utils.RootUtils
 
 class JoyConMapperService : Service() {
     private lateinit var virtualGamepad: VirtualGamepadManager
+    private lateinit var inputHandler: JoyConInputHandler
     private var isRunning = false
     private val CHANNEL_ID = "JoyConServiceChannel"
     private val NOTIFICATION_ID = 101
