@@ -1,5 +1,6 @@
 package com.joyconvirtualpad
 
+import com.joyconvirtualpad.utils.RootUtils
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
