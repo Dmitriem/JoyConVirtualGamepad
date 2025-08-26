@@ -31,8 +31,13 @@ class JoyConMapperService : Service() {
         startForeground(NOTIFICATION_ID, createNotification())
 
         virtualGamepad = VirtualGamepadManager()
+        inputHandler = JoyConInputHandler { code, value, deviceId ->
+            // Отправляем события на виртуальный геймпад
+            virtualGamepad.sendKeyEvent(code, value)
+        }
         
         if (virtualGamepad.createVirtualGamepad()) {
+            inputHandler.startListening()
             isRunning = true
             Log.d("JoyConMapperService", "Service started successfully in foreground")
         } else {
@@ -69,6 +74,7 @@ class JoyConMapperService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        inputHandler.stopListening()
         virtualGamepad.destroy()
         isRunning = false
         Log.d("JoyConMapperService", "Service destroyed")
