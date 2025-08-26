@@ -19,7 +19,7 @@ Java_com_joyconvirtualpad_utils_NativeUinputManager_createUinputDevice(JNIEnv *e
 
     // Enable key events
     ioctl(fd, UI_SET_EVBIT, EV_KEY);
-    for (int i = 0; i < KEY_MAX; i++) {
+    for (int i = BTN_JOYSTICK; i <= BTN_THUMBR; i++) {
         ioctl(fd, UI_SET_KEYBIT, i);
     }
 
@@ -33,7 +33,7 @@ Java_com_joyconvirtualpad_utils_NativeUinputManager_createUinputDevice(JNIEnv *e
     ioctl(fd, UI_SET_ABSBIT, ABS_HAT0Y);
 
     // Setup device
-    uinput_setup usetup = {};
+    struct uinput_setup usetup = {};
     usetup.id.bustype = BUS_USB;
     usetup.id.vendor = 0x045e;  // Microsoft
     usetup.id.product = 0x028e; // Xbox 360 Controller
@@ -57,13 +57,13 @@ Java_com_joyconvirtualpad_utils_NativeUinputManager_createUinputDevice(JNIEnv *e
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_joyconvirtualpad_utils_NativeUinputManager_sendKeyEvent(JNIEnv *env, jobject thiz, jint fd, jint code, jint value) {
-    input_event ev = {};
+    struct input_event ev = {};
     ev.type = EV_KEY;
     ev.code = code;
     ev.value = value;
     write(fd, &ev, sizeof(ev));
 
-    input_event syn = {};
+    struct input_event syn = {};
     syn.type = EV_SYN;
     syn.code = SYN_REPORT;
     syn.value = 0;
