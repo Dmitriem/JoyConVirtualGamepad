@@ -7,6 +7,10 @@ import android.widget.Switch
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.joyconvirtualpad.utils.RootUtils
+import android.content.Context
+import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 
 class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
@@ -15,6 +19,20 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        
+        // Запрос исключения из оптимизации батареи
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                try {
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    intent.data = Uri.parse("package:$packageName")
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
         
         statusText = findViewById(R.id.tvStatus)
         enableSwitch = findViewById(R.id.switchEnable)
