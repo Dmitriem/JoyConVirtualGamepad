@@ -8,47 +8,38 @@ class VirtualGamepadManager {
 
     fun createVirtualGamepad(): Boolean {
         return try {
-            Log.d("VirtualGamepadManager", "Creating virtual gamepad...")
             uinputFd = NativeUinputManager.createUinputDevice()
             if (uinputFd > 0) {
-                Log.d("VirtualGamepadManager", "Virtual gamepad created successfully (fd=$uinputFd)")
+                Log.d("VirtualGamepadManager", "Virtual gamepad created (fd=$uinputFd)")
                 true
             } else {
                 Log.e("VirtualGamepadManager", "Failed to create virtual gamepad (fd=$uinputFd)")
                 false
             }
-        } catch (e: Exception) {
-            Log.e("VirtualGamepadManager", "Error creating virtual gamepad: ${e.message}", e)
+        } catch (t: Throwable) {
+            Log.e("VirtualGamepadManager", "Error createVirtualGamepad: ${t.message}", t)
             false
         }
     }
 
     fun sendButton(code: Int, pressed: Boolean) {
-        if (uinputFd <= 0) {
-            Log.e("VirtualGamepadManager", "Cannot send button - virtual gamepad not created")
-            return
-        }
+        if (uinputFd <= 0) return
         try {
             NativeUinputManager.sendKeyEvent(uinputFd, code, if (pressed) 1 else 0)
             NativeUinputManager.sync(uinputFd)
-            Log.d("VirtualGamepadManager", "Sent button: code=$code pressed=$pressed")
-        } catch (e: Exception) {
-            Log.e("VirtualGamepadManager", "Error sending button: ${e.message}", e)
+        } catch (t: Throwable) {
+            Log.e("VirtualGamepadManager", "sendButton error: ${t.message}", t)
         }
     }
 
     fun sendAxis(code: Int, value: Int) {
-        if (uinputFd <= 0) {
-            Log.e("VirtualGamepadManager", "Cannot send axis - virtual gamepad not created")
-            return
-        }
+        if (uinputFd <= 0) return
         try {
             val clamped = value.coerceIn(-32768, 32767)
             NativeUinputManager.sendAbsEvent(uinputFd, code, clamped)
             NativeUinputManager.sync(uinputFd)
-            Log.d("VirtualGamepadManager", "Sent axis: code=$code value=$clamped")
-        } catch (e: Exception) {
-            Log.e("VirtualGamepadManager", "Error sending axis: ${e.message}", e)
+        } catch (t: Throwable) {
+            Log.e("VirtualGamepadManager", "sendAxis error: ${t.message}", t)
         }
     }
 
@@ -56,11 +47,10 @@ class VirtualGamepadManager {
         if (uinputFd > 0) {
             try {
                 NativeUinputManager.destroyUinputDevice(uinputFd)
-            } catch (e: Exception) {
-                Log.e("VirtualGamepadManager", "Error destroying uinput: ${e.message}", e)
+            } catch (t: Throwable) {
+                // ignore
             }
             uinputFd = -1
-            Log.d("VirtualGamepadManager", "Virtual gamepad destroyed")
         }
     }
 }
