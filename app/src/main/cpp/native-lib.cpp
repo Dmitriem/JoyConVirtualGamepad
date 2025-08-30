@@ -3,9 +3,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <cstring>
-#include <time.h>
 #include <sys/time.h>
 #include <android/log.h>
+#include <sys/ioctl.h>
 
 #define LOG_TAG "JoyConVirtualPad"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -13,10 +13,10 @@
 
 static void emit(int fd, uint16_t type, uint16_t code, int32_t value) {
     struct input_event ie{};
+    gettimeofday(&ie.time, nullptr); // timeval required in input_event on Android NDK
     ie.type = type;
     ie.code = code;
     ie.value = value;
-    gettimeofday(&ie.time, nullptr);
     write(fd, &ie, sizeof(ie));
 }
 
@@ -36,56 +36,52 @@ Java_com_joyconvirtualpad_utils_NativeUinputManager_createUinputDevice(JNIEnv*, 
         BTN_THUMBL, BTN_THUMBR,                   // стики-кнопки
         BTN_START, BTN_SELECT, BTN_MODE           // + - Home
     };
-    for (int code : buttons) {
-        ioctl(fd, UI_SET_KEYBIT, code);
-    }
+    for (int code : buttons) ioctl(fd, UI_SET_KEYBIT, code);
 
-    // Оси
+    // Оси стиков и крестовина
     ioctl(fd, UI_SET_EVBIT, EV_ABS);
     int axes[] = {ABS_X, ABS_Y, ABS_RX, ABS_RY, ABS_HAT0X, ABS_HAT0Y};
-    for (int code : axes) {
-        ioctl(fd, UI_SET_ABSBIT, code);
-    }
+    for (int code : axes) ioctl(fd, UI_SET_ABSBIT, code);
 
-    // Настройки стиков
-    auto set_abs = [&](int code, int min, int max) {
+    // Настройки осей
+    auto setup_abs = [&](int code, int minv, int maxv) {
         struct uinput_abs_setup abs{};
         abs.code = code;
-        abs.absinfo.minimum = min;
-        abs.absinfo.maximum = max;
+        abs.absinfo.minimum = minv;
+        abs.absinfo.maximum = maxv;
         abs.absinfo.fuzz = 16;
         abs.absinfo.flat = 128;
         ioctl(fd, UI_ABS_SETUP, &abs);
     };
-    set_abs(ABS_X, -32768, 32767);
-    set_abs(ABS_Y, -32768, 32767);
-    set_abs(ABS_RX, -32768, 32767);
-    set_abs(ABS_RY, -32768, 32767);
-    set_abs(ABS_HAT0X, -1, 1);
-    set_abs(ABS_HAT0Y, -1, 1);
+    setup_abs(ABS_X, -32768, 32767);
+    setup_abs(ABS_Y, -32768, 32767);
+    setup_abs(ABS_RX, -32768, 32767);
+    setup_abs(ABS_RY, -32768, 32767);
+    setup_abs(ABS_HAT0X, -1, 1);
+    setup_abs(ABS_HAT0Y, -1, 1);
 
-    // Описание виртуального девайса
+    // Описание девайса (подставляем Xbox-like VID/PID)
     struct uinput_setup us{};
     us.id.bustype = BUS_USB;
-    us.id.vendor  = 0x045e; // Microsoft
+    us.id.vendor = 0x045e; // Microsoft (часто распознается как геймпад)
     us.id.product = 0x028e; // Xbox 360 Controller
-    strcpy(us.name, "JoyCon Virtual Gamepad");
+    strncpy(us.name, "JoyCon Virtual Gamepad", sizeof(us.name) - 1);
 
     ioctl(fd, UI_DEV_SETUP, &us);
     ioctl(fd, UI_DEV_CREATE);
 
-    LOGI("Virtual gamepad created (fd=%d)", fd);
+    LOGI("uinput device created (fd=%d)", fd);
     return fd;
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_joyconvirtualpad_utils_NativeUinputManager_sendKeyEvent(JNIEnv*, jobject, jint fd, jint code, jint value) {
-    if (fd > 0) emit(fd, EV_KEY, code, value);
+    if (fd > 0) emit(fd, EV_KEY, (uint16_t)code, value);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_joyconvirtualpad_utils_NativeUinputManager_sendAbsEvent(JNIEnv*, jobject, jint fd, jint code, jint value) {
-    if (fd > 0) emit(fd, EV_ABS, code, value);
+    if (fd > 0) emit(fd, EV_ABS, (uint16_t)code, value);
 }
 
 extern "C" JNIEXPORT void JNICALL
