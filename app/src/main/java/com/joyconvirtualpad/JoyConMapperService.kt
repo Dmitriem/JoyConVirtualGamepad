@@ -35,11 +35,15 @@ class JoyConMapperService : Service() {
             startForeground(NOTIFICATION_ID, createNotification())
             Log.d("JoyConMapperService", "Foreground service started")
 
-            virtualGamepad = VirtualGamepadManager()
             inputHandler = JoyConInputHandler { code, value ->
-                // Отправляем события на виртуальный геймпад
-                virtualGamepad.sendKeyEvent(code, value)
-            }
+                // Если value = 0 или 1 → это кнопка
+                if (value == 0 || value == 1) {
+                    virtualGamepad.sendButton(code, value == 1)
+                } else {
+                    // Иначе считаем это осью (например стики)
+                    virtualGamepad.sendAxis(code, value)
+                }
+           }
             
             if (virtualGamepad.createVirtualGamepad()) {
                 inputHandler.startListening()
