@@ -23,20 +23,41 @@ class VirtualGamepadManager {
         }
     }
     
-    fun sendKeyEvent(code: Int, value: Int) {
+    fun sendButton(code: Int, pressed: Boolean) {
         if (uinputFd <= 0) {
-            Log.e("VirtualGamepadManager", "Cannot send key event - virtual gamepad not created")
+            Log.e("VirtualGamepadManager", "Cannot send button - virtual gamepad not created")
             return
-        }
-        
-        try {
-            Log.d("VirtualGamepadManager", "Sending key event: code=$code, value=$value")
-            NativeUinputManager.sendKeyEvent(uinputFd, code, value)
-        } catch (e: Exception) {
-            Log.e("VirtualGamepadManager", "Error sending key event: ${e.message}", e)
-        }
     }
-    
+    try {
+        NativeUinputManager.sendKeyEvent(uinputFd, code, if (pressed) 1 else 0)
+        NativeUinputManager.sync(uinputFd)
+        Log.d("VirtualGamepadManager", "Sent button: code=$code, pressed=$pressed")
+    } catch (e: Exception) {
+        Log.e("VirtualGamepadManager", "Error sending button: ${e.message}", e)
+    }
+}
+
+fun sendAxis(code: Int, value: Int) {
+    if (uinputFd <= 0) {
+        Log.e("VirtualGamepadManager", "Cannot send axis - virtual gamepad not created")
+        return
+    }
+    try {
+        val clamped = value.coerceIn(-32768, 32767)
+        NativeUinputManager.sendAbsEvent(uinputFd, code, clamped)
+        NativeUinputManager.sync(uinputFd)
+        Log.d("VirtualGamepadManager", "Sent axis: code=$code, value=$clamped")
+    } catch (e: Exception) {
+        Log.e("VirtualGamepadManager", "Error sending axis: ${e.message}", e)
+    }
+}
+
+fun sync() {
+    if (uinputFd > 0) {
+        NativeUinputManager.sync(uinputFd)
+    }
+}
+
     fun destroy() {
         if (uinputFd > 0) {
             try {
