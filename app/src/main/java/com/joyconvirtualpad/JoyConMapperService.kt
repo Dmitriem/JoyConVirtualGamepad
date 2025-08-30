@@ -31,7 +31,7 @@ class JoyConMapperService : Service() {
         startForeground(NOTIFICATION_ID, createNotification())
 
         virtualGamepad = VirtualGamepadManager()
-        inputHandler = JoyConInputHandler { code, value, deviceId ->
+        inputHandler = JoyConInputHandler { code, value ->
             // Отправляем события на виртуальный геймпад
             virtualGamepad.sendKeyEvent(code, value)
         }
@@ -67,7 +67,7 @@ class JoyConMapperService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("JoyCon Virtual Gamepad")
             .setContentText("Combining Joy-Cons into virtual controller")
-            .setSmallIcon(android.R.drawable.ic_menu_manage) // Временная иконка
+            .setSmallIcon(android.R.drawable.ic_menu_manage)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
