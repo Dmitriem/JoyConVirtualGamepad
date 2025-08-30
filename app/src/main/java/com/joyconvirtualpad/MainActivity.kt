@@ -20,30 +20,55 @@ class MainActivity : AppCompatActivity() {
         enableSwitch = findViewById(R.id.switchEnable)
         
         // Проверка root-прав
-        if (!RootUtils.isRootAvailable()) {
-            statusText.text = "Требуется root доступ!"
-            enableSwitch.isEnabled = false
-            return
-        }
-        
-        statusText.text = "Root доступ получен"
+        checkRootAccess()
         
         enableSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                // Запуск сервиса
-                val serviceIntent = Intent(this, JoyConMapperService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(serviceIntent)
-                } else {
-                    startService(serviceIntent)
-                }
-                statusText.text = "Виртуальный геймпад включен"
+                startService()
             } else {
-                // Остановка сервиса
-                val serviceIntent = Intent(this, JoyConMapperService::class.java)
-                stopService(serviceIntent)
-                statusText.text = "Виртуальный геймпад выключен"
+                stopService()
             }
         }
+    }
+    
+    private fun checkRootAccess() {
+        if (!RootUtils.isRootAvailable()) {
+            statusText.text = "Требуется root доступ!"
+            enableSwitch.isEnabled = false
+        } else {
+            statusText.text = "Root доступ получен"
+            enableSwitch.isEnabled = true
+        }
+    }
+    
+    private fun startService() {
+        try {
+            val serviceIntent = Intent(this, JoyConMapperService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+            statusText.text = "Виртуальный геймпад включен"
+        } catch (e: Exception) {
+            statusText.text = "Ошибка запуска сервиса"
+            enableSwitch.isChecked = false
+        }
+    }
+    
+    private fun stopService() {
+        try {
+            val serviceIntent = Intent(this, JoyConMapperService::class.java)
+            stopService(serviceIntent)
+            statusText.text = "Виртуальный геймпад выключен"
+        } catch (e: Exception) {
+            statusText.text = "Ошибка остановки сервиса"
+        }
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        // При возвращении в приложение обновляем статус
+        checkRootAccess()
     }
 }
