@@ -2,7 +2,7 @@ package com.joyconvirtualpad.utils
 
 object NativeUinputManager {
     init {
-        System.loadLibrary("joyconvirtualpad") // имя в CMakeLists (add_library)
+        System.loadLibrary("joyconvirtualpad")
     }
 
     @JvmStatic external fun createUinputDevice(): Int
