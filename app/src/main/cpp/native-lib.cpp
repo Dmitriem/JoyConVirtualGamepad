@@ -15,7 +15,7 @@ static void emit(int fd, uint16_t type, uint16_t code, int32_t value) {
     ie.type = type;
     ie.code = code;
     ie.value = value;
-    clock_gettime(CLOCK_MONOTONIC, &ie.time);
+    gettimeofday(&ie.time, nullptr);
     write(fd, &ie, sizeof(ie));
 }
 
