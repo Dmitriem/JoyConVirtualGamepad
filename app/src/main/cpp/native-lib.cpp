@@ -13,11 +13,12 @@
 
 static void emit(int fd, uint16_t type, uint16_t code, int32_t value) {
     struct input_event ie{};
-    gettimeofday(&ie.time, nullptr); // timeval required in input_event on Android NDK
+    gettimeofday(&ie.time, nullptr);
     ie.type = type;
     ie.code = code;
     ie.value = value;
-    write(fd, &ie, sizeof(ie));
+    ssize_t r = write(fd, &ie, sizeof(ie));
+    (void)r;
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -28,22 +29,22 @@ Java_com_joyconvirtualpad_utils_NativeUinputManager_createUinputDevice(JNIEnv*, 
         return -1;
     }
 
-    // Кнопки
+    // Buttons (EV_KEY)
     ioctl(fd, UI_SET_EVBIT, EV_KEY);
-    int buttons[] = {
+    int keys[] = {
         BTN_SOUTH, BTN_EAST, BTN_NORTH, BTN_WEST, // A B X Y
         BTN_TL, BTN_TR, BTN_TL2, BTN_TR2,         // L R L2 R2
-        BTN_THUMBL, BTN_THUMBR,                   // стики-кнопки
-        BTN_START, BTN_SELECT, BTN_MODE           // + - Home
+        BTN_THUMBL, BTN_THUMBR,                   // stick buttons
+        BTN_START, BTN_SELECT, BTN_MODE           // start/back/home
     };
-    for (int code : buttons) ioctl(fd, UI_SET_KEYBIT, code);
+    for (int k : keys) ioctl(fd, UI_SET_KEYBIT, k);
 
-    // Оси стиков и крестовина
+    // Axes (EV_ABS)
     ioctl(fd, UI_SET_EVBIT, EV_ABS);
     int axes[] = {ABS_X, ABS_Y, ABS_RX, ABS_RY, ABS_HAT0X, ABS_HAT0Y};
-    for (int code : axes) ioctl(fd, UI_SET_ABSBIT, code);
+    for (int a : axes) ioctl(fd, UI_SET_ABSBIT, a);
 
-    // Настройки осей
+    // Configure axis ranges
     auto setup_abs = [&](int code, int minv, int maxv) {
         struct uinput_abs_setup abs{};
         abs.code = code;
@@ -60,12 +61,12 @@ Java_com_joyconvirtualpad_utils_NativeUinputManager_createUinputDevice(JNIEnv*, 
     setup_abs(ABS_HAT0X, -1, 1);
     setup_abs(ABS_HAT0Y, -1, 1);
 
-    // Описание девайса (подставляем Xbox-like VID/PID)
+    // Device description - Xbox-like
     struct uinput_setup us{};
     us.id.bustype = BUS_USB;
-    us.id.vendor = 0x045e; // Microsoft (часто распознается как геймпад)
+    us.id.vendor = 0x045e;  // Microsoft
     us.id.product = 0x028e; // Xbox 360 Controller
-    strncpy(us.name, "JoyCon Virtual Gamepad", sizeof(us.name) - 1);
+    strncpy(us.name, "JoyCon Virtual Gamepad (Xbox)", sizeof(us.name) - 1);
 
     ioctl(fd, UI_DEV_SETUP, &us);
     ioctl(fd, UI_DEV_CREATE);
