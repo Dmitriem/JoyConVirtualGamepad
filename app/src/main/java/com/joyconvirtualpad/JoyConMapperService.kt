@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
@@ -18,33 +19,35 @@ class JoyConMapperService : Service() {
     private val CHANNEL_ID = "JoyConServiceChannel"
     private val NOTIFICATION_ID = 101
 
+    override fun onCreate() {
+        super.onCreate()
+        Log.d("JoyConMapperService", "onCreate")
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         try {
             Log.d("JoyConMapperService", "Starting service...")
-            
+
             if (!RootUtils.isRootAvailable()) {
                 Log.e("JoyConMapperService", "Root access not available")
                 stopSelf()
                 return START_STICKY
             }
 
-            // Создаем канал уведомлений
             createNotificationChannel()
-
-            // Запускаем сервис в foreground с уведомлением
             startForeground(NOTIFICATION_ID, createNotification())
             Log.d("JoyConMapperService", "Foreground service started")
 
+            virtualGamepad = VirtualGamepadManager()
             inputHandler = JoyConInputHandler { code, value ->
-                // Если value = 0 или 1 → это кнопка
+                // Если value == 0/1 — считаем кнопкой, иначе — осью
                 if (value == 0 || value == 1) {
                     virtualGamepad.sendButton(code, value == 1)
                 } else {
-                    // Иначе считаем это осью (например стики)
                     virtualGamepad.sendAxis(code, value)
                 }
-           }
-            
+            }
+
             if (virtualGamepad.createVirtualGamepad()) {
                 inputHandler.startListening()
                 isRunning = true
@@ -54,51 +57,39 @@ class JoyConMapperService : Service() {
                 stopSelf()
             }
 
-            return START_STICKY
         } catch (e: Exception) {
             Log.e("JoyConMapperService", "Error in onStartCommand: ${e.message}", e)
             stopSelf()
-            return START_NOT_STICKY
         }
+
+        // Важно: возвращаем START_STICKY чтобы сервис перезапускался если система убьёт процесс
+        return START_STICKY
     }
 
     private fun createNotificationChannel() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val manager = getSystemService(NotificationManager::class.java)
                 val channel = NotificationChannel(
                     CHANNEL_ID,
                     "JoyCon Virtual Gamepad Service",
                     NotificationManager.IMPORTANCE_LOW
-                ).apply {
-                    description = "Service for combining Joy-Cons into virtual gamepad"
-                }
-
-                val manager = getSystemService(NotificationManager::class.java)
+                ).apply { description = "Service for combining Joy-Cons into virtual gamepad" }
                 manager.createNotificationChannel(channel)
                 Log.d("JoyConMapperService", "Notification channel created")
             }
         } catch (e: Exception) {
-            Log.e("JoyConMapperService", "Error creating notification channel: ${e.message}", e)
+            Log.e("JoyConMapperService", "Error creating channel: ${e.message}", e)
         }
     }
 
     private fun createNotification(): Notification {
-        return try {
-            NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("JoyCon Virtual Gamepad")
-                .setContentText("Combining Joy-Cons into virtual controller")
-                .setSmallIcon(android.R.drawable.ic_menu_manage)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .build()
-        } catch (e: Exception) {
-            Log.e("JoyConMapperService", "Error creating notification: ${e.message}", e)
-            // Возвращаем простейшее уведомление в случае ошибки
-            NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("JoyCon Service")
-                .setContentText("Service is running")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .build()
-        }
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("JoyCon Virtual Gamepad")
+            .setContentText("Combining Joy-Cons into virtual controller")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
     }
 
     override fun onDestroy() {
