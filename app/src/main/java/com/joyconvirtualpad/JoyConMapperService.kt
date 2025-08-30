@@ -25,7 +25,7 @@ class JoyConMapperService : Service() {
             if (!RootUtils.isRootAvailable()) {
                 Log.e("JoyConMapperService", "Root access not available")
                 stopSelf()
-                return START_NOT_STICKY
+                return START_STICKY
             }
 
             // Создаем канал уведомлений
