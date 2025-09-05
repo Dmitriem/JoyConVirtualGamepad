@@ -26,9 +26,11 @@ static int write_uinput(int fd, int type, int code, int value) {
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_joyconvirtualpad_utils_NativeUinputManager_createUinputDevice(JNIEnv*, jclass) {
-    // Открываем uinput
     int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
-    if (fd < 0) return -1;
+    if (fd < 0) {
+        __android_log_print(ANDROID_LOG_ERROR, "NativeUinput", "open /dev/uinput failed: %s", strerror(errno));
+        return -1;
+    }
 
     // Разрешаем типы событий
     ioctl(fd, UI_SET_EVBIT, EV_KEY);
