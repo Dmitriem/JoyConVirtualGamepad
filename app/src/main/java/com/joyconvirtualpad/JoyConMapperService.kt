@@ -21,49 +21,37 @@ class JoyConMapperService : Service() {
     private lateinit var inputHandler: JoyConInputHandler
     private val CHANNEL_ID = "JoyConServiceChannel"
     private val NOTIF_ID = 101
-    private val TAG = "JoyConMapperService"
+
+    private fun statusFile(): File =
+        File(MyApp.appContext.getExternalFilesDir(null), "joycon_status.txt")
 
     private fun writeStatus(text: String) {
-        try { File("/sdcard/joycon_status.txt").appendText("${System.currentTimeMillis()}: $text\n") } catch (_: Exception) {}
-    }
-
-    override fun onCreate() {
-        super.onCreate()
-        writeStatus("Service onCreate")
-        Log.d(TAG, "onCreate")
+        try { statusFile().appendText("${System.currentTimeMillis()}: $text\n") } catch (_: Exception) {}
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        writeStatus("onStartCommand")
-        Log.d(TAG, "Starting service")
-
-        // Обработка команды остановки из уведомления
+        // STOP из уведомления
         if (intent?.action == "ACTION_STOP_SERVICE") {
-            writeStatus("Received ACTION_STOP_SERVICE -> stopping")
+            writeStatus("stop action received")
             stopSelf()
             return START_STICKY
         }
 
-        // Проверим root (вдвойне)
+        writeStatus("onStartCommand")
         if (!RootUtils.isRootAvailable()) {
-            writeStatus("Root not available - abort")
+            writeStatus("Root not available")
             stopSelf()
             return START_STICKY
         }
-        // Попробуем выполнить простую команду - убедимся, что su разрешён
         val ok = RootUtils.executeCommand("id")
-        writeStatus("Root executeCommand(id) returned: $ok")
-        if (!ok) {
-            writeStatus("Root auth failed - please grant su to app")
-            // можно уведомить пользователя, но продолжаем — createVirtualGamepad проверит
-        }
+        writeStatus("su test id -> $ok")
 
         createNotificationChannel()
         startForeground(NOTIF_ID, buildNotification())
 
         virtualGamepad = VirtualGamepadManager()
         if (!virtualGamepad.createVirtualGamepad()) {
-            writeStatus("uinput creation failed - stopping")
+            writeStatus("uinput create failed")
             stopSelf()
             return START_STICKY
         }
@@ -71,42 +59,35 @@ class JoyConMapperService : Service() {
         inputHandler = JoyConInputHandler { code, value ->
             if (value == 0 || value == 1) virtualGamepad.sendButton(code, value == 1)
             else virtualGamepad.sendAxis(code, value)
-            // записываем пару событий для проверки
             writeStatus("evt code=$code val=$value")
         }
         inputHandler.startListening()
-        writeStatus("Service started successfully")
+        writeStatus("service started ok")
         return START_STICKY
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Когда приложение свайпнут, перезапускаем сервис через AlarmManager через 1 сек
-        try {
-            val restartIntent = Intent(applicationContext, JoyConMapperService::class.java)
-            val pending = PendingIntent.getService(
-                applicationContext,
-                1,
-                restartIntent,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT else PendingIntent.FLAG_ONE_SHOT
-            )
-            val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            am.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + 1000, pending)
-            writeStatus("onTaskRemoved: scheduled restart")
-        } catch (e: Exception) {
-            writeStatus("onTaskRemoved error: ${e.message}")
-        }
+        // перезапуск через 1 сек после свайпа
+        val restartIntent = Intent(applicationContext, JoyConMapperService::class.java)
+        val pending = PendingIntent.getService(
+            applicationContext, 1, restartIntent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
+            else PendingIntent.FLAG_ONE_SHOT
+        )
+        val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        am.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + 1000, pending)
+        writeStatus("scheduled restart from onTaskRemoved")
         super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         try {
             inputHandler.stopListening()
             virtualGamepad.destroy()
-            writeStatus("Service destroyed")
-        } catch (e: Exception) {
-            writeStatus("onDestroy exception: ${e.message}")
-        }
+            writeStatus("service destroyed")
+        } catch (_: Exception) {}
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -121,22 +102,18 @@ class JoyConMapperService : Service() {
     }
 
     private fun buildNotification(): Notification {
-        // создаём PendingIntent для остановки сервиса
         val stopIntent = Intent(this, JoyConMapperService::class.java).apply { action = "ACTION_STOP_SERVICE" }
         val stopPending = PendingIntent.getService(
-            this,
-            2,
-            stopIntent,
+            this, 2, stopIntent,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
         )
-
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("JoyCon Virtual Gamepad")
             .setContentText("Running — virtual Xbox controller active")
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setOngoing(true)
             .addAction(android.R.drawable.ic_delete, "Stop", stopPending)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-        return builder.build()
+            .build()
     }
 }
