@@ -9,91 +9,53 @@ class VirtualGamepadManager {
     private var uinputFd: Int = -1
     private val TAG = "VirtualGamepadManager"
 
+    private fun statusFile(): File =
+        File(MyApp.appContext.getExternalFilesDir(null), "joycon_status.txt")
+
     private fun writeStatus(text: String) {
-        try {
-            File("/sdcard/joycon_status.txt").appendText("${System.currentTimeMillis()}: $text\n")
-        } catch (_: Exception) {}
+        try { statusFile().appendText("${System.currentTimeMillis()}: $text\n") } catch (_: Exception) {}
     }
 
     fun createVirtualGamepad(): Boolean {
         try {
-            writeStatus("createVirtualGamepad: starting")
-            Log.d(TAG, "Attempting modprobe uinput")
-            // Попробовать загрузить модуль uinput (если это применимо)
-            try {
-                RootUtils.executeCommand("modprobe uinput")
-            } catch (_: Exception) {}
+            writeStatus("createVirtualGamepad: start")
+            RootUtils.executeCommand("modprobe uinput || true")
+            RootUtils.executeCommand("chmod 666 /dev/uinput || true")
 
-            // Поставим права на /dev/uinput на случай, если это помогает
-            RootUtils.executeCommand("chmod 666 /dev/uinput")
-
-            // Первый вызов нативной функции
             uinputFd = NativeUinputManager.createUinputDevice()
             if (uinputFd > 0) {
-                Log.d(TAG, "Virtual gamepad created (fd=$uinputFd)")
                 writeStatus("uinput created fd=$uinputFd")
                 return true
             }
-
-            // Если не получилось, попробуем ещё раз после небольшой операции
-            Log.w(TAG, "First create failed, retrying after chmod/modprobe")
-            writeStatus("createVirtualGamepad: first attempt failed, retrying")
-
-            RootUtils.executeCommand("chmod 666 /dev/uinput")
+            writeStatus("first create failed, retrying")
+            RootUtils.executeCommand("chmod 666 /dev/uinput || true")
             uinputFd = NativeUinputManager.createUinputDevice()
-            if (uinputFd > 0) {
-                Log.d(TAG, "Virtual gamepad created on retry (fd=$uinputFd)")
-                writeStatus("uinput created on retry fd=$uinputFd")
-                return true
-            }
-
-            Log.e(TAG, "Failed to create virtual gamepad, fd=$uinputFd")
-            writeStatus("FAILED to create uinput (fd=$uinputFd)")
-            return false
+            val ok = uinputFd > 0
+            writeStatus(if (ok) "uinput created on retry fd=$uinputFd" else "FAILED to create uinput")
+            return ok
         } catch (e: Exception) {
-            Log.e(TAG, "Error creating virtual gamepad: ${e.message}", e)
             writeStatus("Exception createVirtualGamepad: ${e.message}")
+            Log.e(TAG, "create err", e)
             return false
         }
     }
 
     fun sendButton(code: Int, pressed: Boolean) {
-        if (uinputFd <= 0) {
-            writeStatus("sendButton ignored - no uinput")
-            return
-        }
-        try {
-            NativeUinputManager.sendKeyEvent(uinputFd, code, if (pressed) 1 else 0)
-            NativeUinputManager.sync(uinputFd)
-        } catch (e: Exception) {
-            Log.e(TAG, "sendButton error: ${e.message}", e)
-            writeStatus("sendButton error: ${e.message}")
-        }
+        if (uinputFd <= 0) { writeStatus("sendButton ignored - no uinput"); return }
+        NativeUinputManager.sendKeyEvent(uinputFd, code, if (pressed) 1 else 0)
+        NativeUinputManager.sync(uinputFd)
     }
 
     fun sendAxis(code: Int, value: Int) {
-        if (uinputFd <= 0) {
-            writeStatus("sendAxis ignored - no uinput")
-            return
-        }
-        try {
-            val clamped = value.coerceIn(-32768, 32767)
-            NativeUinputManager.sendAbsEvent(uinputFd, code, clamped)
-            NativeUinputManager.sync(uinputFd)
-        } catch (e: Exception) {
-            Log.e(TAG, "sendAxis error: ${e.message}", e)
-            writeStatus("sendAxis error: ${e.message}")
-        }
+        if (uinputFd <= 0) { writeStatus("sendAxis ignored - no uinput"); return }
+        val clamped = value.coerceIn(-32767, 32767)
+        NativeUinputManager.sendAbsEvent(uinputFd, code, clamped)
+        NativeUinputManager.sync(uinputFd)
     }
 
     fun destroy() {
         if (uinputFd > 0) {
-            try {
-                NativeUinputManager.destroyUinputDevice(uinputFd)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error destroying uinput: ${e.message}", e)
-                writeStatus("destroy error: ${e.message}")
-            }
+            NativeUinputManager.destroyUinputDevice(uinputFd)
             uinputFd = -1
             writeStatus("uinput destroyed")
         }
