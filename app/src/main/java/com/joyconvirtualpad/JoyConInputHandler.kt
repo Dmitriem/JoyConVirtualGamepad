@@ -5,10 +5,6 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.Executors
 
-/**
- * Запускает "su -c getevent -lt" и парсит вывод.
- * Передаёт в onEvent код (линейный код EV_KEY/EV_ABS) и значение.
- */
 class JoyConInputHandler(private val onEvent: (code: Int, value: Int) -> Unit) {
     private var proc: Process? = null
     private val executor = Executors.newSingleThreadExecutor()
@@ -46,59 +42,63 @@ class JoyConInputHandler(private val onEvent: (code: Int, value: Int) -> Unit) {
     }
 
     private fun parseLine(line: String) {
-        // интересуют строки с '(EV_KEY ...)' или '(EV_ABS ...)'
         if (!line.contains("(") || !line.contains("EV_")) return
         try {
             val inside = line.substringAfter("(").substringBefore(")")
             val parts = inside.trim().split(Regex("\\s+"))
             if (parts.size < 2) return
             val evType = parts[0] // EV_KEY or EV_ABS
-            val codeName = parts[1] // e.g. BTN_SOUTH or ABS_RX
+            val codeName = parts[1]
 
-            val code = mapNameToCode(codeName) ?: return
+            // map JoyCon → Xbox
+            val mapped = mapNameToXbox(codeName, line)
+            val code = mapped?.first ?: return
+            val value = mapped.second
 
-            if (evType == "EV_KEY") {
-                val value = when {
-                    inside.contains("DOWN") -> 1
-                    inside.contains("UP") -> 0
-                    else -> Regex("(-?\\d+)$").find(line)?.value?.toIntOrNull() ?: 0
-                }
-                onEvent(code, value)
-            } else if (evType == "EV_ABS") {
-                val value = Regex("(-?\\d+)$").find(line)?.value?.toIntOrNull() ?: 0
-                onEvent(code, value)
-            }
+            onEvent(code, value)
         } catch (e: Exception) {
             Log.e("JoyConInputHandler", "parse error: ${e.message}", e)
         }
     }
 
-    private fun mapNameToCode(name: String): Int? {
-        // EV_KEY -> linux BTN_* codes, EV_ABS -> ABS_* integer codes
+    private fun mapNameToXbox(name: String, line: String): Pair<Int, Int>? {
         return when (name) {
-            // buttons -> BTN_* linux codes
-            "BTN_SOUTH" -> 304 // A
-            "BTN_EAST" -> 305  // B
-            "BTN_NORTH" -> 307 // X
-            "BTN_WEST" -> 308  // Y
-            "BTN_TL" -> 310    // L
-            "BTN_TR" -> 311    // R
-            "BTN_TL2" -> 312   // L2
-            "BTN_TR2" -> 313   // R2
-            "BTN_THUMBL" -> 317
-            "BTN_THUMBR" -> 318
-            "BTN_START" -> 315
-            "BTN_SELECT" -> 314
+            // ---- Buttons (совпадают с Xbox) ----
+            "BTN_SOUTH" -> Pair(304, extractValue(line)) // A
+            "BTN_EAST" -> Pair(305, extractValue(line))  // B
+            "BTN_NORTH" -> Pair(307, extractValue(line)) // X
+            "BTN_WEST" -> Pair(308, extractValue(line))  // Y
+            "BTN_TL" -> Pair(310, extractValue(line))    // LB
+            "BTN_TR" -> Pair(311, extractValue(line))    // RB
+            "BTN_TL2" -> Pair(312, extractValue(line))   // LT
+            "BTN_TR2" -> Pair(313, extractValue(line))   // RT
+            "BTN_SELECT" -> Pair(314, extractValue(line))// Back
+            "BTN_START" -> Pair(315, extractValue(line)) // Start
+            "BTN_MODE" -> Pair(316, extractValue(line))  // Xbox/Guide
+            "BTN_THUMBL" -> Pair(317, extractValue(line))// L3
+            "BTN_THUMBR" -> Pair(318, extractValue(line))// R3
 
-            // axes -> ABS_* codes (numbers as in linux/input-event-codes.h)
-            "ABS_X" -> 0
-            "ABS_Y" -> 1
-            "ABS_RX" -> 3
-            "ABS_RY" -> 4
-            "ABS_HAT0X" -> 16
-            "ABS_HAT0Y" -> 17
+            // ---- D-Pad: конвертация в HAT ----
+            "BTN_DPAD_UP" -> Pair(17, if (extractValue(line) == 1) -1 else 0)    // ABS_HAT0Y up
+            "BTN_DPAD_DOWN" -> Pair(17, if (extractValue(line) == 1) 1 else 0)   // ABS_HAT0Y down
+            "BTN_DPAD_LEFT" -> Pair(16, if (extractValue(line) == 1) -1 else 0)  // ABS_HAT0X left
+            "BTN_DPAD_RIGHT" -> Pair(16, if (extractValue(line) == 1) 1 else 0)  // ABS_HAT0X right
+
+            // ---- Axes ----
+            "ABS_X" -> Pair(0, extractValue(line))   // Left stick X
+            "ABS_Y" -> Pair(1, extractValue(line))   // Left stick Y
+            "ABS_RX" -> Pair(3, extractValue(line))  // Right stick X
+            "ABS_RY" -> Pair(4, extractValue(line))  // Right stick Y
 
             else -> null
+        }
+    }
+
+    private fun extractValue(line: String): Int {
+        return when {
+            line.contains("DOWN") -> 1
+            line.contains("UP") -> 0
+            else -> Regex("(-?\\d+)$").find(line)?.value?.toIntOrNull() ?: 0
         }
     }
 }
