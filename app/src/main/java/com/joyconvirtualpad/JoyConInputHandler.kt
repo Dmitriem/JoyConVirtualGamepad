@@ -11,9 +11,9 @@ class JoyConInputHandler(private val onEvent: (code: Int, value: Int) -> Unit) {
 
     fun startListening() {
         try {
+            // слушаем все input события через getevent -lt (root)
             proc = Runtime.getRuntime().exec(arrayOf("su", "-c", "getevent -lt"))
             val reader = BufferedReader(InputStreamReader(proc!!.inputStream))
-
             executor.submit {
                 try {
                     var line: String?
@@ -24,7 +24,6 @@ class JoyConInputHandler(private val onEvent: (code: Int, value: Int) -> Unit) {
                     Log.e("JoyConInputHandler", "reader loop ended: ${t.message}", t)
                 }
             }
-            Log.d("JoyConInputHandler", "Started getevent parser")
         } catch (e: Exception) {
             Log.e("JoyConInputHandler", "Failed to start getevent: ${e.message}", e)
         }
@@ -35,10 +34,7 @@ class JoyConInputHandler(private val onEvent: (code: Int, value: Int) -> Unit) {
             proc?.destroy()
             proc = null
             executor.shutdownNow()
-            Log.d("JoyConInputHandler", "Stopped listening")
-        } catch (e: Exception) {
-            Log.e("JoyConInputHandler", "Error stopping: ${e.message}", e)
-        }
+        } catch (_: Exception) {}
     }
 
     private fun parseLine(line: String) {
@@ -47,57 +43,45 @@ class JoyConInputHandler(private val onEvent: (code: Int, value: Int) -> Unit) {
             val inside = line.substringAfter("(").substringBefore(")")
             val parts = inside.trim().split(Regex("\\s+"))
             if (parts.size < 2) return
-            val evType = parts[0] // EV_KEY or EV_ABS
-            val codeName = parts[1]
+            val type = parts[0]      // EV_KEY / EV_ABS
+            val codeName = parts[1]  // BTN_* / ABS_*
 
-            // map JoyCon → Xbox
-            val mapped = mapNameToXbox(codeName, line)
-            val code = mapped?.first ?: return
-            val value = mapped.second
+            val value = extractValue(line)
+            when (codeName) {
+                // Кнопки (совпадают с Xbox)
+                "BTN_SOUTH" -> onEvent(304, value) // A
+                "BTN_EAST"  -> onEvent(305, value) // B
+                "BTN_NORTH" -> onEvent(307, value) // X
+                "BTN_WEST"  -> onEvent(308, value) // Y
+                "BTN_TL"    -> onEvent(310, value) // LB
+                "BTN_TR"    -> onEvent(311, value) // RB
+                "BTN_TL2"   -> onEvent(312, value) // LT (цифрово)
+                "BTN_TR2"   -> onEvent(313, value) // RT (цифрово)
+                "BTN_SELECT"-> onEvent(314, value) // Back
+                "BTN_START" -> onEvent(315, value) // Start
+                "BTN_MODE"  -> onEvent(316, value) // Guide
+                "BTN_THUMBL"-> onEvent(317, value) // L3
+                "BTN_THUMBR"-> onEvent(318, value) // R3
 
-            onEvent(code, value)
-        } catch (e: Exception) {
-            Log.e("JoyConInputHandler", "parse error: ${e.message}", e)
-        }
-    }
+                // D-Pad → HAT
+                "BTN_DPAD_LEFT"  -> onEvent(16, if (value == 1) -1 else 0) // ABS_HAT0X
+                "BTN_DPAD_RIGHT" -> onEvent(16, if (value == 1)  1 else 0)
+                "BTN_DPAD_UP"    -> onEvent(17, if (value == 1) -1 else 0) // ABS_HAT0Y
+                "BTN_DPAD_DOWN"  -> onEvent(17, if (value == 1)  1 else 0)
 
-    private fun mapNameToXbox(name: String, line: String): Pair<Int, Int>? {
-        return when (name) {
-            // ---- Buttons (совпадают с Xbox) ----
-            "BTN_SOUTH" -> Pair(304, extractValue(line)) // A
-            "BTN_EAST" -> Pair(305, extractValue(line))  // B
-            "BTN_NORTH" -> Pair(307, extractValue(line)) // X
-            "BTN_WEST" -> Pair(308, extractValue(line))  // Y
-            "BTN_TL" -> Pair(310, extractValue(line))    // LB
-            "BTN_TR" -> Pair(311, extractValue(line))    // RB
-            "BTN_TL2" -> Pair(312, extractValue(line))   // LT
-            "BTN_TR2" -> Pair(313, extractValue(line))   // RT
-            "BTN_SELECT" -> Pair(314, extractValue(line))// Back
-            "BTN_START" -> Pair(315, extractValue(line)) // Start
-            "BTN_MODE" -> Pair(316, extractValue(line))  // Xbox/Guide
-            "BTN_THUMBL" -> Pair(317, extractValue(line))// L3
-            "BTN_THUMBR" -> Pair(318, extractValue(line))// R3
-
-            // ---- D-Pad: конвертация в HAT ----
-            "BTN_DPAD_UP" -> Pair(17, if (extractValue(line) == 1) -1 else 0)    // ABS_HAT0Y up
-            "BTN_DPAD_DOWN" -> Pair(17, if (extractValue(line) == 1) 1 else 0)   // ABS_HAT0Y down
-            "BTN_DPAD_LEFT" -> Pair(16, if (extractValue(line) == 1) -1 else 0)  // ABS_HAT0X left
-            "BTN_DPAD_RIGHT" -> Pair(16, if (extractValue(line) == 1) 1 else 0)  // ABS_HAT0X right
-
-            // ---- Axes ----
-            "ABS_X" -> Pair(0, extractValue(line))   // Left stick X
-            "ABS_Y" -> Pair(1, extractValue(line))   // Left stick Y
-            "ABS_RX" -> Pair(3, extractValue(line))  // Right stick X
-            "ABS_RY" -> Pair(4, extractValue(line))  // Right stick Y
-
-            else -> null
-        }
+                // Стики
+                "ABS_X"  -> onEvent(0, value)
+                "ABS_Y"  -> onEvent(1, value)
+                "ABS_RX" -> onEvent(3, value)
+                "ABS_RY" -> onEvent(4, value)
+            }
+        } catch (_: Exception) {}
     }
 
     private fun extractValue(line: String): Int {
         return when {
             line.contains("DOWN") -> 1
-            line.contains("UP") -> 0
+            line.contains("UP")   -> 0
             else -> Regex("(-?\\d+)$").find(line)?.value?.toIntOrNull() ?: 0
         }
     }
