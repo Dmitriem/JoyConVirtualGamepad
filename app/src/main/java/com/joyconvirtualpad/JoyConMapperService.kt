@@ -37,6 +37,13 @@ class JoyConMapperService : Service() {
         writeStatus("onStartCommand")
         Log.d(TAG, "Starting service")
 
+        // Обработка команды остановки из уведомления
+        if (intent?.action == "ACTION_STOP_SERVICE") {
+            writeStatus("Received ACTION_STOP_SERVICE -> stopping")
+            stopSelf()
+            return START_STICKY
+        }
+
         // Проверим root (вдвойне)
         if (!RootUtils.isRootAvailable()) {
             writeStatus("Root not available - abort")
@@ -48,7 +55,7 @@ class JoyConMapperService : Service() {
         writeStatus("Root executeCommand(id) returned: $ok")
         if (!ok) {
             writeStatus("Root auth failed - please grant su to app")
-            // Нотификация будет показывать, что нужен root
+            // можно уведомить пользователя, но продолжаем — createVirtualGamepad проверит
         }
 
         createNotificationChannel()
@@ -76,8 +83,12 @@ class JoyConMapperService : Service() {
         // Когда приложение свайпнут, перезапускаем сервис через AlarmManager через 1 сек
         try {
             val restartIntent = Intent(applicationContext, JoyConMapperService::class.java)
-            val pending = PendingIntent.getService(applicationContext, 1, restartIntent,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT else PendingIntent.FLAG_ONE_SHOT)
+            val pending = PendingIntent.getService(
+                applicationContext,
+                1,
+                restartIntent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT else PendingIntent.FLAG_ONE_SHOT
+            )
             val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
             am.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + 1000, pending)
             writeStatus("onTaskRemoved: scheduled restart")
@@ -110,15 +121,14 @@ class JoyConMapperService : Service() {
     }
 
     private fun buildNotification(): Notification {
-        // действие остановки сервиса
+        // создаём PendingIntent для остановки сервиса
         val stopIntent = Intent(this, JoyConMapperService::class.java).apply { action = "ACTION_STOP_SERVICE" }
-        val stopPending = PendingIntent.getService(this, 2, stopIntent,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
-
-        // Если пришёл интент остановки, обрабатываем в onStartCommand
-        if (intent?.action == "ACTION_STOP_SERVICE") {
-            stopSelf()
-        }
+        val stopPending = PendingIntent.getService(
+            this,
+            2,
+            stopIntent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        )
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("JoyCon Virtual Gamepad")
