@@ -5,6 +5,7 @@
 #include <string.h>
 #include <time.h>
 #include <errno.h>
+#include <android/log.h>
 
 static int ufd = -1;
 
